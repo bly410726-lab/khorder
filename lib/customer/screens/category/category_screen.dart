@@ -19,17 +19,33 @@ class CategoryScreen extends StatefulWidget {
 
 class _CategoryScreenState extends State<CategoryScreen> {
   int? _selectedCategoryId;
-
+  bool _isInitialized = false;
   @override
-  void initState() {
-    super.initState();
-    final args = ModalRoute.of(context)?.settings.arguments as CategoryModel?;
-    final productProvider = context.read<ProductProvider>();
-    _selectedCategoryId = args?.id ?? productProvider.selectedCategoryId;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _load();
-    });
+  void didChangeDependencies(){
+    super.didChangeDependencies();
+
+    if(!_isInitialized ){
+      final args = ModalRoute.of(context)?.settings.arguments as CategoryModel? ;
+      final productProvider = context.read<ProductProvider>();
+
+      _selectedCategoryId = args?.id ?? productProvider.selectedCategoryId ;
+      _load() ;
+
+      _isInitialized = true ;
+
+    }
   }
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   final args = ModalRoute.of(context)?.settings.arguments as CategoryModel?;
+  //   final productProvider = context.read<ProductProvider>();
+  //   _selectedCategoryId = args?.id ?? productProvider.selectedCategoryId;
+  //   WidgetsBinding.instance.addPostFrameCallback((_) {
+  //     _load();
+  //   });
+  // }
 
   Future<void> _load() async {
     final categoryProvider = context.read<CategoryProvider>();

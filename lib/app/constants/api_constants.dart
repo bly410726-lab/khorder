@@ -28,6 +28,10 @@ class ApiConstants {
   static const String cartItems = '/cart/items';
   static const String favorites = '/favorites';
   static const String orders = '/orders';
+  static const String aiChat = '/ai/chat';
+
+  //
+  static const String banners = '/banners';
 
   //
   static const String adminDashboard = '/admin/dashboard';
@@ -35,4 +39,5 @@ class ApiConstants {
   static const String adminCategories = '/admin/categories';
   static const String adminOrders = '/admin/orders';
   static const String adminUsers = '/admin/users';
+  static const String adminBanners = '/admin/banners';
 }

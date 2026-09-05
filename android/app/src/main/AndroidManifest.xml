@@ -8,10 +8,10 @@
         android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- 📍 ដាក់ Google Maps API Key របស់អ្នកនៅទីនេះ -->
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBTzZVtm0j7PyCGPy7xKlHG0R5W_4dHAX0"/>
+            android:value="AIzaSyC-mXrgoH2TYWM7aUDqV8RJN6U-jQ6bq6Q"/>
 
         <activity
             android:name=".MainActivity"

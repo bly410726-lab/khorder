@@ -56,6 +56,11 @@ class AdminDrawer extends StatelessWidget {
             route: AppRoutes.adminCategories,
           ),
           _DrawerItem(
+            icon: Icons.view_carousel_outlined,
+            label: 'Banners',
+            route: AppRoutes.adminBanners,
+          ),
+          _DrawerItem(
             icon: Icons.receipt_long_outlined,
             label: 'Orders',
             route: AppRoutes.adminOrders,

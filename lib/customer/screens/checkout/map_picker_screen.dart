@@ -30,6 +30,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   bool _isGeocoding = false;
   bool _isLocatingUser = false;
   bool _hasError = false;
+  String? _errorMessage;
 
   DeliveryLocation? _selectedLocation;
   String? _selectedAddress;
@@ -77,10 +78,9 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
       );
       if (!mounted) return;
-      _moveCamera(
-        LatLng(position.latitude, position.longitude),
-        MapsConstants.defaultZoom,
-      );
+      final target = LatLng(position.latitude, position.longitude);
+      _cameraCenter = target;
+      await _moveCamera(target, MapsConstants.defaultZoom);
       _onCameraIdle();
     } catch (_) {
       // Leave the camera at the default location.
@@ -117,11 +117,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     setState(() {
       _isGeocoding = true;
       _hasError = false;
+      _errorMessage = null;
       _selectedLocation = null;
     });
 
     final requestCenter = center;
-    final location = await GeocodingService.instance.reverseGeocode(
+    final result = await GeocodingService.instance.reverseGeocode(
       latitude: requestCenter.latitude,
       longitude: requestCenter.longitude,
     );
@@ -130,11 +131,12 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
     setState(() {
       _isGeocoding = false;
-      if (location != null) {
-        _selectedLocation = location;
-        _selectedAddress = location.address;
+      if (result.location != null) {
+        _selectedLocation = result.location;
+        _selectedAddress = result.location!.address;
       } else {
         _hasError = true;
+        _errorMessage = result.errorMessage;
         _selectedAddress = null;
       }
     });
@@ -170,10 +172,9 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
       );
       if (!mounted) return;
-      await _moveCamera(
-        LatLng(position.latitude, position.longitude),
-        MapsConstants.defaultZoom,
-      );
+      final target = LatLng(position.latitude, position.longitude);
+      _cameraCenter = target;
+      await _moveCamera(target, MapsConstants.defaultZoom);
       _onCameraIdle();
     } catch (_) {
       if (mounted) {
@@ -383,16 +384,37 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                     ),
                   )
                 : _hasError
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Column(
                           children: [
-                            Icon(Icons.error_outline,
+                            const Icon(Icons.error_outline,
                                 color: AppColors.error, size: 32),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text(
-                              'Unable to find the address for this location.',
+                              _errorMessage ??
+                                  'Unable to find the address for this location.',
                               textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                final center = _cameraCenter;
+                                if (center != null) {
+                                  _reverseGeocode(center);
+                                }
+                              },
+                              icon: const Icon(Icons.refresh, size: 18),
+                              label: const Text('Retry'),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(0, 36),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                              ),
                             ),
                           ],
                         ),

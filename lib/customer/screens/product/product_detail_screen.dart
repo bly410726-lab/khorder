@@ -20,15 +20,28 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
   ProductModel? _product;
+  bool _isInitialized = false ;
 
   @override
-  void initState() {
-    super.initState();
-    final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is ProductModel) {
-      _product = args;
+  void didChangeDependencies (){
+    super.didChangeDependencies();
+    if (!_isInitialized){
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if(args is ProductModel){
+        _product = args ;
+      }
+      _isInitialized = true ;
     }
   }
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   final args = ModalRoute.of(context)?.settings.arguments;
+  //   if (args is ProductModel) {
+  //     _product = args;
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {

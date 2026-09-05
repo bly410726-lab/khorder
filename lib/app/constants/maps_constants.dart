@@ -1,7 +1,7 @@
 class MapsConstants {
   MapsConstants._();
 
-  static const String googleApiKey = 'AIzaSyBTzZVtm0j7PyCGPy7xKlHG0R5W_4dHAX0';
+  static const String googleApiKey = 'AIzaSyC-mXrgoH2TYWM7aUDqV8RJN6U-jQ6bq6Q';
 
   static const double defaultLatitude = 11.562108;
   static const double defaultLongitude = 104.888535;

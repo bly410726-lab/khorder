@@ -5,6 +5,7 @@ class AppRoutes {
   static const String register = '/register';
 
   static const String home = '/home';
+  static const String aiChat = '/ai-chat';
   static const String productDetail = '/product-detail';
   static const String search = '/search';
   static const String category = '/category';
@@ -24,6 +25,7 @@ class AppRoutes {
   static const String adminCategories = '/admin/categories';
   static const String adminAddCategory = '/admin/categories/add';
   static const String adminEditCategory = '/admin/categories/edit';
+  static const String adminBanners = '/admin/banners';
   static const String adminOrders = '/admin/orders';
   static const String adminOrderDetail = '/admin/orders/detail';
   static const String adminUsers = '/admin/users';

@@ -78,8 +78,13 @@ class ApiService {
     }
   }
 
-  Future<dynamic> post(String path, {Map<String, dynamic>? body}) async {
+  Future<dynamic> post(
+    String path, {
+    Map<String, dynamic>? body,
+    Duration? timeout,
+  }) async {
     final uri = _buildUri(path);
+    final effectiveTimeout = timeout ?? _timeout;
     _debugLog('REQUEST', 'POST $uri');
     try {
       final response = await http
@@ -88,7 +93,7 @@ class ApiService {
             headers: _headers,
             body: jsonEncode(body ?? {}),
           )
-          .timeout(_timeout);
+          .timeout(effectiveTimeout);
       _debugLog('RESPONSE', 'POST $uri -> ${response.statusCode}');
       final snippet = _snippet(response.body);
       if (snippet.isNotEmpty) _debugLog('BODY', snippet);
@@ -189,16 +194,19 @@ class ApiService {
     if (statusCode == 401) {
       throw ApiException(
         _extractMessage(body) ?? 'Your session has expired. Please log in again.',
+        statusCode: statusCode,
       );
     }
     if (statusCode == 403) {
       throw ApiException(
         _extractMessage(body) ?? 'You do not have permission to perform this action.',
+        statusCode: statusCode,
       );
     }
     if (statusCode == 404) {
       throw ApiException(
         _extractMessage(body) ?? 'The requested resource was not found.',
+        statusCode: statusCode,
       );
     }
     if (statusCode == 422) {
@@ -209,10 +217,12 @@ class ApiService {
         validationErrors: validationErrors is Map<String, dynamic>
             ? validationErrors
             : null,
+        statusCode: statusCode,
       );
     }
     throw ApiException(
       _extractMessage(body) ?? 'Something went wrong. Please try again later.',
+      statusCode: statusCode,
     );
   }
 
@@ -227,12 +237,15 @@ class ApiService {
 }
 
 class ApiException implements Exception {
-  ApiException(this.message, {this.validationErrors});
+  ApiException(this.message, {this.validationErrors, this.statusCode});
 
   final String message;
 
   /// Map of field name -> list of error messages (from 422 validation).
   final Map<String, dynamic>? validationErrors;
+
+  /// HTTP status code that caused this exception, when known.
+  final int? statusCode;
 
   String? fieldError(String field) {
     final errors = validationErrors?[field];

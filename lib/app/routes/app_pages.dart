@@ -5,6 +5,7 @@ import '../../core/navigation/route_guard.dart';
 import '../../customer/screens/auth/login_screen.dart';
 import '../../customer/screens/auth/register_screen.dart';
 import '../../customer/screens/main_shell.dart';
+import '../../customer/screens/chat/ai_chat_screen.dart';
 import '../../customer/screens/product/product_detail_screen.dart';
 import '../../customer/screens/product/search_screen.dart';
 import '../../customer/screens/category/category_screen.dart';
@@ -24,6 +25,7 @@ import '../../admin/screens/products/edit_product_screen.dart';
 import '../../admin/screens/categories/admin_categories_screen.dart';
 import '../../admin/screens/categories/add_category_screen.dart';
 import '../../admin/screens/categories/edit_category_screen.dart';
+import '../../admin/screens/banners/admin_banners_screen.dart';
 import '../../admin/screens/orders/admin_orders_screen.dart';
 import '../../admin/screens/orders/admin_order_detail_screen.dart';
 import '../../admin/screens/users/admin_users_screen.dart';
@@ -41,6 +43,7 @@ class AppPages {
       AppRoutes.register: (context) => const RegisterScreen(),
 
       AppRoutes.home: (context) => const RouteGuard(child: MainShell()),
+      AppRoutes.aiChat: (context) => const RouteGuard(child: AiChatScreen()),
       AppRoutes.productDetail: (context) =>
           const RouteGuard(child: ProductDetailScreen()),
       AppRoutes.search: (context) => const RouteGuard(child: SearchScreen()),
@@ -70,6 +73,8 @@ class AppPages {
           const RouteGuard(requiresAdmin: true, child: AddCategoryScreen()),
       AppRoutes.adminEditCategory: (context) =>
           const RouteGuard(requiresAdmin: true, child: EditCategoryScreen()),
+      AppRoutes.adminBanners: (context) =>
+          const RouteGuard(requiresAdmin: true, child: AdminBannersScreen()),
       AppRoutes.adminOrders: (context) =>
           const RouteGuard(requiresAdmin: true, child: AdminOrdersScreen()),
       AppRoutes.adminOrderDetail: (context) =>

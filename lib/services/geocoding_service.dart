@@ -1,10 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 
 import '../app/constants/maps_constants.dart';
 import '../models/delivery_location_model.dart';
+
+class GeocodingResult {
+  final DeliveryLocation? location;
+  final String? errorMessage;
+
+  const GeocodingResult({this.location, this.errorMessage});
+}
 
 class GeocodingService {
   GeocodingService._();
@@ -13,10 +21,25 @@ class GeocodingService {
 
   static const Duration _timeout = Duration(seconds: 15);
 
-  Future<DeliveryLocation?> reverseGeocode({
+  Future<GeocodingResult> reverseGeocode({
     required double latitude,
     required double longitude,
   }) async {
+    if (latitude < -90 || latitude > 90) {
+      developer.log(
+        '[REVERSE GEOCODING] Invalid latitude: $latitude',
+        name: 'GeocodingService',
+      );
+      return const GeocodingResult(errorMessage: 'Invalid latitude value.');
+    }
+    if (longitude < -180 || longitude > 180) {
+      developer.log(
+        '[REVERSE GEOCODING] Invalid longitude: $longitude',
+        name: 'GeocodingService',
+      );
+      return const GeocodingResult(errorMessage: 'Invalid longitude value.');
+    }
+
     final uri = Uri.https(
       'maps.googleapis.com',
       'maps/api/geocode/json',
@@ -27,28 +50,85 @@ class GeocodingService {
       },
     );
 
+    developer.log(
+      '[REVERSE GEOCODING REQUEST]\n'
+      'Latitude: $latitude\n'
+      'Longitude: $longitude\n'
+      'Endpoint: ${uri.scheme}://${uri.host}${uri.path}\n'
+      'HTTP method: GET',
+      name: 'GeocodingService',
+    );
+
     try {
       final response = await http.get(uri).timeout(_timeout);
+
+      developer.log(
+        '[REVERSE GEOCODING RESPONSE]\n'
+        'HTTP Status: ${response.statusCode}\n'
+        'Response body: ${response.body}',
+        name: 'GeocodingService',
+      );
+
       if (response.statusCode != 200) {
-        return null;
+        return GeocodingResult(
+          errorMessage:
+              'Geocoding server returned HTTP ${response.statusCode}.',
+        );
       }
 
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
       final status = decoded['status'] as String?;
 
       if (status != 'OK') {
-        return null;
+        final errorMsg =
+            decoded['error_message'] as String? ?? 'Unknown error ($status)';
+        developer.log(
+          '[REVERSE GEOCODING ERROR]\n'
+          'Google status: $status\n'
+          'Error message: $errorMsg',
+          name: 'GeocodingService',
+        );
+        if (status == 'REQUEST_DENIED') {
+          return GeocodingResult(
+            errorMessage:
+                'Geocoding API request denied. $errorMsg',
+          );
+        }
+        if (status == 'ZERO_RESULTS') {
+          return GeocodingResult(
+            errorMessage:
+                'No address found for this location.',
+          );
+        }
+        if (status == 'OVER_QUERY_LIMIT') {
+          return GeocodingResult(
+            errorMessage:
+                'Geocoding API quota exceeded. Please try again later.',
+          );
+        }
+        if (status == 'INVALID_REQUEST') {
+          return const GeocodingResult(
+            errorMessage: 'Invalid geocoding request.',
+          );
+        }
+        return GeocodingResult(
+          errorMessage: 'Geocoding failed: $errorMsg',
+        );
       }
 
       final results = decoded['results'] as List?;
       if (results == null || results.isEmpty) {
-        return null;
+        return const GeocodingResult(
+          errorMessage: 'No address found for this location.',
+        );
       }
 
       final result = results.first as Map<String, dynamic>;
       final formattedAddress = result['formatted_address'] as String?;
       if (formattedAddress == null || formattedAddress.isEmpty) {
-        return null;
+        return const GeocodingResult(
+          errorMessage: 'No address found for this location.',
+        );
       }
 
       final addressComponents =
@@ -58,19 +138,45 @@ class GeocodingService {
         components: addressComponents,
       );
 
-      return DeliveryLocation(
-        address: addressLine,
-        latitude: latitude,
-        longitude: longitude,
+      return GeocodingResult(
+        location: DeliveryLocation(
+          address: addressLine,
+          latitude: latitude,
+          longitude: longitude,
+        ),
       );
     } on TimeoutException {
-      return null;
-    } on http.ClientException {
-      return null;
-    } on FormatException {
-      return null;
-    } catch (_) {
-      return null;
+      developer.log(
+        '[REVERSE GEOCODING ERROR] Request timed out',
+        name: 'GeocodingService',
+      );
+      return const GeocodingResult(
+        errorMessage: 'Geocoding request timed out. Check your connection.',
+      );
+    } on http.ClientException catch (e) {
+      developer.log(
+        '[REVERSE GEOCODING ERROR] ClientException: ${e.message}',
+        name: 'GeocodingService',
+      );
+      return const GeocodingResult(
+        errorMessage: 'Network error while finding address.',
+      );
+    } on FormatException catch (e) {
+      developer.log(
+        '[REVERSE GEOCODING ERROR] FormatException: ${e.message}',
+        name: 'GeocodingService',
+      );
+      return const GeocodingResult(
+        errorMessage: 'Invalid response from geocoding service.',
+      );
+    } catch (e) {
+      developer.log(
+        '[REVERSE GEOCODING ERROR] Unexpected: $e',
+        name: 'GeocodingService',
+      );
+      return const GeocodingResult(
+        errorMessage: 'An unexpected error occurred while finding address.',
+      );
     }
   }
 
