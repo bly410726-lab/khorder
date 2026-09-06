@@ -5,15 +5,15 @@ class ApiConstants {
   ApiConstants._();
 
   static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000/api';
-    }
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000/api';
-    }
-    return 'http://127.0.0.1:8000/api';
+    return "https://replacing-seek-predict-fence.trycloudflare.com/api";
+    // if (kIsWeb) { https://few-celebs-height-instant.trycloudflare.com
+    //   return 'http://127.0.0.1:8000/api';
+    // }
+    // if (defaultTargetPlatform == TargetPlatform.android) {
+    //   return 'http://10.0.2.2:8000/api';
+    // }
+    // return 'http://127.0.0.1:8000/api';
   }
-
   //
   static const String login = '/login';
   static const String register = '/register';
@@ -29,7 +29,6 @@ class ApiConstants {
   static const String favorites = '/favorites';
   static const String orders = '/orders';
   static const String aiChat = '/ai/chat';
-
   //
   static const String banners = '/banners';
 
