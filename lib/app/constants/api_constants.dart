@@ -5,7 +5,7 @@ class ApiConstants {
   ApiConstants._();
 
   static String get baseUrl {
-    return "https://replacing-seek-predict-fence.trycloudflare.com/api";
+    return "https://care-timber-celebrate-bell.trycloudflare.com/api";
     // if (kIsWeb) { https://few-celebs-height-instant.trycloudflare.com
     //   return 'http://127.0.0.1:8000/api';
     // }
