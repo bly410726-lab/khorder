@@ -25,6 +25,7 @@ class OrderProvider extends ChangeNotifier {
       _orders = await _orderService.fetchOrders();
       _errorMessage = null;
     } catch (e) {
+      _orders = [];
       _errorMessage = _friendlyError(e);
     } finally {
       _isLoading = false;
@@ -45,9 +46,10 @@ class OrderProvider extends ChangeNotifier {
   }
 
   Future<OrderModel?> placeOrder({
-    required String shippingAddress,
+    required String deliveryAddress,
     required String shippingPhone,
     required String paymentMethod,
+    required double deliveryFee,
     String? notes,
   }) async {
     _isPlacingOrder = true;
@@ -56,14 +58,12 @@ class OrderProvider extends ChangeNotifier {
 
     try {
       final order = await _orderService.placeOrder(
-        shippingAddress: shippingAddress,
+        deliveryAddress: deliveryAddress,
         shippingPhone: shippingPhone,
         paymentMethod: paymentMethod,
+        deliveryFee: deliveryFee,
         notes: notes,
       );
-      if (order != null) {
-        await fetchOrders();
-      }
       return order;
     } catch (e) {
       _errorMessage = _friendlyError(e);

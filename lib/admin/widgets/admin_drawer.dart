@@ -83,7 +83,7 @@ class AdminDrawer extends StatelessWidget {
               Helpers.showSnackBar(context, 'Logged out');
               Navigator.pushNamedAndRemoveUntil(
                 context,
-                AppRoutes.adminLogin,
+                AppRoutes.login,
                 (route) => false,
               );
             },

@@ -12,6 +12,7 @@ import '../../customer/screens/category/category_screen.dart';
 import '../../customer/screens/cart/cart_screen.dart';
 import '../../customer/screens/favorite/favorite_screen.dart';
 import '../../customer/screens/checkout/checkout_screen.dart';
+import '../../customer/screens/checkout/map_picker_screen.dart';
 import '../../customer/screens/orders/orders_screen.dart';
 import '../../customer/screens/orders/order_detail_screen.dart';
 import '../../customer/screens/profile/profile_screen.dart';
@@ -51,6 +52,7 @@ class AppPages {
       AppRoutes.cart: (context) => const RouteGuard(child: CartScreen()),
       AppRoutes.favorite: (context) => const RouteGuard(child: FavoriteScreen()),
       AppRoutes.checkout: (context) => const RouteGuard(child: CheckoutScreen()),
+      AppRoutes.mapPicker: (context) => const MapPickerScreen(),
       AppRoutes.orders: (context) => const RouteGuard(child: OrdersScreen()),
       AppRoutes.orderDetail: (context) =>
           const RouteGuard(child: OrderDetailScreen()),
@@ -58,7 +60,7 @@ class AppPages {
       AppRoutes.editProfile: (context) =>
           const RouteGuard(child: EditProfileScreen()),
 
-      AppRoutes.adminLogin: (context) => const AdminLoginScreen(),
+      AppRoutes.login: (context) => const LoginScreen(),
       AppRoutes.adminDashboard: (context) =>
           const RouteGuard(requiresAdmin: true, child: AdminDashboardScreen()),
       AppRoutes.adminProducts: (context) =>

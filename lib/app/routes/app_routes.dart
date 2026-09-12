@@ -12,6 +12,7 @@ class AppRoutes {
   static const String cart = '/cart';
   static const String favorite = '/favorite';
   static const String checkout = '/checkout';
+  static const String mapPicker = '/map-picker';
   static const String orders = '/orders';
   static const String orderDetail = '/order-detail';
   static const String profile = '/profile';

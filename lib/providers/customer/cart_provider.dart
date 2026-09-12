@@ -102,13 +102,16 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> clearCart() async {
-    _items = [];
-    notifyListeners();
+  Future<bool> clearCart() async {
     try {
       await _cartService.clearCart();
-    } catch (_) {
-      // Local cart cleared; take no further action.
+      _items = [];
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = _friendlyError(e);
+      notifyListeners();
+      return false;
     }
   }
 

@@ -11,7 +11,6 @@ import '../../../models/order_model.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/customer/cart_provider.dart';
 import '../../../providers/customer/order_provider.dart';
-import 'map_picker_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -24,24 +23,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   static const double deliveryFee = 2.0;
 
   final _formKey = GlobalKey<FormState>();
+
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
   final _notesController = TextEditingController();
-  String _paymentMethod = 'cod';
+
   DeliveryLocation? _deliveryLocation;
+  String _paymentMethod = 'cod';
+  bool _isInitialized = false;
 
   static const _paymentMethods = [
-    ('cod', 'Cash on Delivery', Icons.payments_outlined),
-    ('khqr', 'KHQR / ABA Pay', Icons.qr_code_2),
+    (
+    'cod',
+    'Cash on Delivery',
+    Icons.payments_outlined,
+    ),
+    (
+    'khqr',
+    'KHQR / ABA Pay',
+    Icons.qr_code_2,
+    ),
   ];
 
   @override
-  void initState() {
-    super.initState();
-    final user = context.read<AuthProvider>().user;
-    _nameController.text = user?.name ?? '';
-    _phoneController.text = user?.phone ?? '';
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Autofill user information if available asynchronously
+    if (!_isInitialized) {
+      final user = context.read<AuthProvider>().user;
+      if (user != null) {
+        if (_nameController.text.isEmpty) _nameController.text = user.name ?? '';
+        if (_phoneController.text.isEmpty) _phoneController.text = user.phone ?? '';
+      }
+      _isInitialized = true;
+    }
   }
 
   @override
@@ -60,201 +77,209 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final items = cartProvider.items;
     final subtotal = cartProvider.subtotal;
+    final total = subtotal + deliveryFee;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Checkout')),
+      appBar: AppBar(
+        title: const Text('Checkout'),
+      ),
       body: items.isEmpty
-          ? const Center(child: Text('Your cart is empty'))
+          ? const Center(
+        child: Text('Your cart is empty'),
+      )
           : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // =========================================================
+            // DELIVERY INFORMATION
+            // =========================================================
+            _SectionCard(
+              title: 'Delivery Information',
+              icon: Icons.local_shipping_outlined,
+              child: Column(
                 children: [
-                  _SectionCard(
-                    title: 'Delivery Information',
-                    icon: Icons.local_shipping_outlined,
-                    child: Column(
-                      children: [
-                        CustomTextField(
-                          controller: _nameController,
-                          labelText: 'Full Name',
-                          icon: Icons.person_outline,
-                          validator: Validators.validateName,
-                        ),
-                        const SizedBox(height: 14),
-                        CustomTextField(
-                          controller: _phoneController,
-                          labelText: 'Phone Number',
-                          icon: Icons.phone_outlined,
-                          keyboardType: TextInputType.phone,
-                          validator: Validators.validatePhone,
-                        ),
-                        const SizedBox(height: 14),
-                        CustomTextField(
-                          controller: _addressController,
-                          labelText: 'Delivery Address',
-                          hintText: 'Tap to choose your delivery location on the map',
-                          icon: Icons.location_on_outlined,
-                          readOnly: true,
-                          onTap: _openMapPicker,
-                          suffixIcon: const Icon(Icons.map_outlined),
-                          validator: (value) {
-                            if (_deliveryLocation == null ||
-                                _deliveryLocation!.address.isEmpty) {
-                              return 'Please select your delivery location on the map';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              _deliveryLocation == null
-                                  ? Icons.info_outline
-                                  : Icons.check_circle,
-                              size: 14,
-                              color: _deliveryLocation == null
-                                  ? AppColors.textSecondary
-                                  : AppColors.success,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                _deliveryLocation == null
-                                    ? 'Tap the field to choose your location on the map.'
-                                    : 'Location selected. Tap to change.',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        CustomTextField(
-                          controller: _notesController,
-                          labelText: 'Note (optional)',
-                          icon: Icons.notes_outlined,
-                          maxLines: 2,
-                        ),
-                      ],
+                  CustomTextField(
+                    controller: _nameController,
+                    labelText: 'Full Name',
+                    icon: Icons.person_outline,
+                    validator: Validators.validateName,
+                  ),
+                  const SizedBox(height: 14),
+                  CustomTextField(
+                    controller: _phoneController,
+                    labelText: 'Phone Number',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    validator: Validators.validatePhone,
+                  ),
+                  const SizedBox(height: 14),
+                  CustomTextField(
+                    controller: _addressController,
+                    labelText: 'Delivery Address',
+                    icon: Icons.location_on_outlined,
+                    validator: Validators.validateAddress,
+                    readOnly: true,
+                    onTap: _pickDeliveryLocation,
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.map_outlined, color: AppColors.primary),
+                      onPressed: _pickDeliveryLocation,
                     ),
                   ),
                   const SizedBox(height: 14),
-                  _SectionCard(
-                    title: 'Payment Method',
-                    icon: Icons.credit_card_outlined,
-                    child: RadioGroup<String>(
-                      groupValue: _paymentMethod,
-                      onChanged: (value) {
-                        setState(() => _paymentMethod = value ?? 'cod');
-                      },
-                      child: Column(
-                        children: _paymentMethods.map((method) {
-                          final key = method.$1;
-                          return RadioListTile<String>(
-                            value: key,
-                            title: Text(method.$2),
-                            secondary:
-                                Icon(method.$3, color: AppColors.primary),
-                            activeColor: AppColors.primary,
-                            contentPadding: EdgeInsets.zero,
-                            dense: true,
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                  CustomTextField(
+                    controller: _notesController,
+                    labelText: 'Note (optional)',
+                    icon: Icons.notes_outlined,
+                    maxLines: 2,
                   ),
-                  const SizedBox(height: 14),
-                  _SectionCard(
-                    title: 'Order Summary',
-                    icon: Icons.receipt_long_outlined,
-                    child: Column(
-                      children: [
-                        ...items.map(
-                          (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '${item.product?.name ?? 'Product'} × ${item.quantity}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  '\$${item.totalPrice.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const Divider(height: 16),
-                        _Row(label: 'Subtotal', value: '\$${subtotal.toStringAsFixed(2)}'),
-                        const SizedBox(height: 4),
-                        _Row(label: 'Delivery fee', value: '\$${deliveryFee.toStringAsFixed(2)}'),
-                        const SizedBox(height: 4),
-                        _Row(
-                          label: 'Total',
-                          value: '\$${(subtotal + deliveryFee).toStringAsFixed(2)}',
-                          emphasized: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: orderProvider.isPlacingOrder
-                        ? null
-                        : () => _placeOrder(orderProvider),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 54),
-                    ),
-                    child: orderProvider.isPlacingOrder
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Place Order',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(height: 24),
                 ],
               ),
             ),
-    );
-  }
 
-  Future<void> _openMapPicker() async {
-    final result = await Navigator.of(context).push<DeliveryLocation>(
-      MaterialPageRoute(
-        builder: (context) => MapPickerScreen(
-          initialLocation: _deliveryLocation,
+            const SizedBox(height: 14),
+
+            // =========================================================
+            // PAYMENT METHOD
+            // =========================================================
+            _SectionCard(
+              title: 'Payment Method',
+              icon: Icons.credit_card_outlined,
+              child: Column(
+                children: _paymentMethods.map((method) {
+                  final key = method.$1;
+                  final title = method.$2;
+                  final icon = method.$3;
+
+                  return RadioListTile<String>(
+                    value: key,
+                    groupValue: _paymentMethod,
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _paymentMethod = value;
+                        });
+                      }
+                    },
+                    title: Text(title),
+                    secondary: Icon(
+                      icon,
+                      color: AppColors.primary,
+                    ),
+                    activeColor: AppColors.primary,
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  );
+                }).toList(),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // =========================================================
+            // ORDER SUMMARY
+            // =========================================================
+            _SectionCard(
+              title: 'Order Summary',
+              icon: Icons.receipt_long_outlined,
+              child: Column(
+                children: [
+                  ...items.map(
+                        (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${item.product?.name ?? 'Product'} × ${item.quantity}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '\$${item.totalPrice.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 16),
+                  _Row(
+                    label: 'Subtotal',
+                    value: '\$${subtotal.toStringAsFixed(2)}',
+                  ),
+                  const SizedBox(height: 4),
+                  _Row(
+                    label: 'Delivery fee',
+                    value: '\$${deliveryFee.toStringAsFixed(2)}',
+                  ),
+                  const SizedBox(height: 4),
+                  _Row(
+                    label: 'Total',
+                    value: '\$${total.toStringAsFixed(2)}',
+                    emphasized: true,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // =========================================================
+            // PLACE ORDER BUTTON
+            // =========================================================
+            FilledButton(
+              onPressed: orderProvider.isPlacingOrder
+                  ? null
+                  : () => _handlePlaceOrder(orderProvider, cartProvider),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 54),
+              ),
+              child: orderProvider.isPlacingOrder
+                  ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+                  : const Text(
+                'Place Order',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+          ],
         ),
       ),
     );
+  }
 
-    if (result != null && mounted) {
+  // ===========================================================
+  // DELIVERY LOCATION PICKER
+  // ===========================================================
+
+  Future<void> _pickDeliveryLocation() async {
+    final result = await Navigator.pushNamed(
+      context,
+      AppRoutes.mapPicker,
+      arguments: _deliveryLocation,
+    );
+    if (result is DeliveryLocation && mounted) {
       setState(() {
         _deliveryLocation = result;
         _addressController.text = result.address;
@@ -262,43 +287,145 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  Future<void> _placeOrder(OrderProvider orderProvider) async {
-    if (!_formKey.currentState!.validate()) return;
+  // ===========================================================
+  // PLACE ORDER ACTION
+  // ===========================================================
 
-    final location = _deliveryLocation;
+  Future<void> _handlePlaceOrder(
+      OrderProvider orderProvider,
+      CartProvider cartProvider,
+      ) async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-    final order = await orderProvider.placeOrder(
-      shippingAddress: location?.address.isNotEmpty == true
-          ? location!.address
-          : _addressController.text.trim(),
-      shippingPhone: _phoneController.text.trim(),
-      paymentMethod: _paymentMethod,
-      notes: _notesController.text.trim().isEmpty
-          ? null
-          : _notesController.text.trim(),
-    );
-
-    if (!mounted) return;
-
-    if (order != null && order.id != null) {
-      await context.read<CartProvider>().clearCart();
-      if (!mounted) return;
-      _showSuccessAndNavigate(order);
+    if (_paymentMethod == 'khqr') {
+      _showKhqrModal(orderProvider, cartProvider);
     } else {
+      await _processOrderPlacement(orderProvider, cartProvider);
+    }
+  }
+
+  Future<void> _processOrderPlacement(
+      OrderProvider orderProvider,
+      CartProvider cartProvider,
+      ) async {
+    try {
+      final order = await orderProvider.placeOrder(
+        deliveryAddress: _addressController.text.trim(),
+        shippingPhone: _phoneController.text.trim(),
+        paymentMethod: _paymentMethod,
+        deliveryFee: deliveryFee,
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      if (order != null) {
+        await cartProvider.clearCart();
+        _showSuccessAndNavigate(order);
+      } else {
+        Helpers.showSnackBar(
+          context,
+          'Failed to place order. Please try again.',
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
       Helpers.showSnackBar(
         context,
-        orderProvider.errorMessage ?? 'Could not place your order. Please try again.',
-        isError: true,
+        'An error occurred: ${e.toString()}',
       );
     }
   }
+
+  // ===========================================================
+  // KHQR MODAL DIALOG
+  // ===========================================================
+
+  void _showKhqrModal(
+      OrderProvider orderProvider,
+      CartProvider cartProvider,
+      ) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.qr_code_2, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text('KHQR Payment'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.qr_code_2,
+                    size: 160,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Customer: ${_nameController.text}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Scan this QR code with any mobile banking app to complete payment.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await _processOrderPlacement(orderProvider, cartProvider);
+              },
+              child: const Text('Confirm & Pay'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ===========================================================
+  // SUCCESS & NAVIGATION
+  // ===========================================================
 
   void _showSuccessAndNavigate(OrderModel order) {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.check_circle, color: AppColors.success, size: 56),
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.check_circle,
+          color: AppColors.success,
+          size: 56,
+        ),
         title: const Text('Order Placed!'),
         content: const Text(
           'Thank you for your order. You can track its status in My Orders.',
@@ -308,16 +435,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         actions: [
           FilledButton(
             onPressed: () {
-              Navigator.of(context).pop();
-              final orderId = order.id;
-              Navigator.pushNamedAndRemoveUntil(
+              Navigator.of(dialogContext).pop();
+              Navigator.of(context).popUntil((route) => route.isFirst);
+              Navigator.pushNamed(
                 context,
                 AppRoutes.orderDetail,
-                (route) => false,
-                arguments: orderId,
+                arguments: order.id,
               );
             },
-            style: FilledButton.styleFrom(minimumSize: const Size(150, 46)),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(150, 46),
+            ),
             child: const Text('View Order'),
           ),
         ],
@@ -325,6 +453,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 }
+
+// ============================================================================
+// SECTION CARD
+// ============================================================================
 
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
@@ -367,6 +499,10 @@ class _SectionCard extends StatelessWidget {
     );
   }
 }
+
+// ============================================================================
+// SUMMARY ROW
+// ============================================================================
 
 class _Row extends StatelessWidget {
   const _Row({

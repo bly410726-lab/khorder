@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../app/constants/maps_constants.dart';
 import '../../../app/theme/app_colors.dart';
@@ -20,12 +21,11 @@ class MapPickerScreen extends StatefulWidget {
 }
 
 class _MapPickerScreenState extends State<MapPickerScreen> {
-  final GlobalKey _mapKey = GlobalKey();
-
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
   Timer? _debounce;
   LatLng? _cameraCenter;
-  LatLng? _pendingTarget;
+
+  int _requestId = 0;
 
   bool _isGeocoding = false;
   bool _isLocatingUser = false;
@@ -52,9 +52,14 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
-    _mapController?.dispose();
     super.dispose();
   }
+
+  LatLng get _initialCenter => _cameraCenter ??
+      LatLng(
+        widget.initialLocation?.latitude ?? MapsConstants.defaultLatitude,
+        widget.initialLocation?.longitude ?? MapsConstants.defaultLongitude,
+      );
 
   Future<void> _ensureInitialLocation() async {
     if (widget.initialLocation != null) return;
@@ -80,8 +85,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       if (!mounted) return;
       final target = LatLng(position.latitude, position.longitude);
       _cameraCenter = target;
-      await _moveCamera(target, MapsConstants.defaultZoom);
-      _onCameraIdle();
+      _mapController.move(target, MapsConstants.defaultZoom);
+      _onMapTap(target);
     } catch (_) {
       // Leave the camera at the default location.
     } finally {
@@ -89,30 +94,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     }
   }
 
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
-  }
-
-  Future<void> _moveCamera(LatLng target, double zoom) async {
-    final controller = _mapController;
-    if (controller == null) return;
-    await controller.moveCamera(CameraUpdate.newLatLngZoom(target, zoom));
-  }
-
-  void _onCameraIdle() {
-    final center = _cameraCenter;
-    if (center == null) return;
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _reverseGeocode(center);
-    });
-  }
-
   Future<void> _reverseGeocode(LatLng center) async {
-    if (_isGeocoding) {
-      _pendingTarget = center;
-      return;
-    }
+    final int myRequestId = ++_requestId;
 
     setState(() {
       _isGeocoding = true;
@@ -121,13 +104,13 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       _selectedLocation = null;
     });
 
-    final requestCenter = center;
     final result = await GeocodingService.instance.reverseGeocode(
-      latitude: requestCenter.latitude,
-      longitude: requestCenter.longitude,
+      latitude: center.latitude,
+      longitude: center.longitude,
     );
 
     if (!mounted) return;
+    if (myRequestId != _requestId) return;
 
     setState(() {
       _isGeocoding = false;
@@ -140,12 +123,15 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
         _selectedAddress = null;
       }
     });
+  }
 
-    final pending = _pendingTarget;
-    _pendingTarget = null;
-    if (pending != null && pending != requestCenter) {
-      _reverseGeocode(pending);
-    }
+  void _onMapTap(LatLng point) {
+    _cameraCenter = point;
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _reverseGeocode(point);
+    });
+    setState(() {});
   }
 
   Future<void> _locateUser() async {
@@ -174,8 +160,8 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       if (!mounted) return;
       final target = LatLng(position.latitude, position.longitude);
       _cameraCenter = target;
-      await _moveCamera(target, MapsConstants.defaultZoom);
-      _onCameraIdle();
+      _mapController.move(target, MapsConstants.defaultZoom);
+      _onMapTap(target);
     } catch (_) {
       if (mounted) {
         Helpers.showSnackBar(
@@ -191,11 +177,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
   bool get _canConfirm =>
       _selectedLocation != null &&
-      _selectedLocation!.isValid &&
-      _selectedAddress != null &&
-      _selectedAddress!.isNotEmpty &&
-      !_isGeocoding &&
-      !_hasError;
+          _selectedLocation!.isValid &&
+          _selectedAddress != null &&
+          _selectedAddress!.isNotEmpty &&
+          !_isGeocoding &&
+          !_hasError;
 
   void _confirm() {
     final location = _selectedLocation;
@@ -204,11 +190,20 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   void _changeLocation() {
+    _requestId++;
+    _debounce?.cancel();
+
     setState(() {
       _selectedLocation = null;
       _selectedAddress = null;
       _hasError = false;
+      _isGeocoding = false;
     });
+
+    final center = _cameraCenter;
+    if (center != null) {
+      _reverseGeocode(center);
+    }
   }
 
   @override
@@ -218,27 +213,41 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: GoogleMap(
-              key: _mapKey,
-              initialCameraPosition: CameraPosition(
-                target: LatLng(
-                  widget.initialLocation?.latitude ??
-                      MapsConstants.defaultLatitude,
-                  widget.initialLocation?.longitude ??
-                      MapsConstants.defaultLongitude,
-                ),
-                zoom: MapsConstants.defaultZoom,
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _initialCenter,
+                initialZoom: MapsConstants.defaultZoom,
+                onTap: (tapPosition, point) => _onMapTap(point),
               ),
-              onMapCreated: _onMapCreated,
-              onCameraMove: (position) {
-                _cameraCenter = position.target;
-              },
-              onCameraIdle: _onCameraIdle,
-              myLocationEnabled: false,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              mapToolbarEnabled: false,
-              compassEnabled: false,
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.khorder.app',
+                ),
+                MarkerLayer(
+                  markers: [
+                    if (_cameraCenter != null)
+                      Marker(
+                        point: _cameraCenter!,
+                        width: 50,
+                        height: 50,
+                        child: const Icon(
+                          Icons.location_pin,
+                          size: 50,
+                          color: AppColors.primary,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black38,
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
           Align(
@@ -246,25 +255,6 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
               child: _buildSearchBar(),
-            ),
-          ),
-          Center(
-            child: IgnorePointer(
-              child: Transform.translate(
-                offset: const Offset(0, -48),
-                child: const Icon(
-                  Icons.location_pin,
-                  size: 48,
-                  color: AppColors.primary,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black38,
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
           Align(
@@ -299,7 +289,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             child: Text(
               _isGeocoding
                   ? 'Finding address...'
-                  : (_selectedAddress ?? 'Drag the map to choose a location'),
+                  : (_selectedAddress ?? 'Tap the map to choose a location'),
               style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
             ),
           ),
@@ -307,13 +297,13 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             onPressed: _isLocatingUser ? null : _locateUser,
             icon: _isLocatingUser
                 ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.primary,
-                    ),
-                  )
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.primary,
+              ),
+            )
                 : const Icon(Icons.my_location, color: AppColors.primary),
             tooltip: 'Use my current location',
           ),
@@ -354,11 +344,11 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
+            const Row(
               children: [
                 Icon(Icons.location_on, color: AppColors.primary),
-                const SizedBox(width: 8),
-                const Text(
+                SizedBox(width: 8),
+                Text(
                   'Selected Delivery Location',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
@@ -367,111 +357,111 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
             const SizedBox(height: 12),
             _isGeocoding
                 ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.primary,
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Finding address...'),
+                ],
+              ),
+            )
+                : _hasError
+                ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                children: [
+                  const Icon(Icons.error_outline,
+                      color: AppColors.error, size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    _errorMessage ??
+                        'Unable to find the address for this location.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      final center = _cameraCenter;
+                      if (center != null) {
+                        _reverseGeocode(center);
+                      }
+                    },
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Retry'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                      padding:
+                      const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                  ),
+                ],
+              ),
+            )
+                : Column(
+              children: [
+                if (_selectedAddress != null)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 18,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _selectedAddress!,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textPrimary,
                           ),
                         ),
-                        SizedBox(width: 12),
-                        Text('Finding address...'),
-                      ],
-                    ),
-                  )
-                : _hasError
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.error_outline,
-                                color: AppColors.error, size: 32),
-                            const SizedBox(height: 8),
-                            Text(
-                              _errorMessage ??
-                                  'Unable to find the address for this location.',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              onPressed: () {
-                                final center = _cameraCenter;
-                                if (center != null) {
-                                  _reverseGeocode(center);
-                                }
-                              },
-                              icon: const Icon(Icons.refresh, size: 18),
-                              label: const Text('Retry'),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(0, 36),
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : Column(
-                        children: [
-                          if (_selectedAddress != null)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.location_on_outlined,
-                                  size: 18,
-                                  color: AppColors.textSecondary,
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    _selectedAddress!,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          else
-                            const Text(
-                              'Moving the map will find an address.',
-                              style: TextStyle(color: AppColors.textSecondary),
-                            ),
-                          if (_selectedLocation != null) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Text(
-                                  'Latitude: ${_selectedLocation!.latitude.toStringAsFixed(6)}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Text(
-                                  'Longitude: ${_selectedLocation!.longitude.toStringAsFixed(6)}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
                       ),
-             SizedBox(height: 16),
+                    ],
+                  )
+                else
+                  const Text(
+                    'Tap the map to choose a location.',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                if (_selectedLocation != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        'Latitude: ${_selectedLocation!.latitude.toStringAsFixed(6)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        'Longitude: ${_selectedLocation!.longitude.toStringAsFixed(6)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(

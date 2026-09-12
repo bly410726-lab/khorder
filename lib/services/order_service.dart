@@ -53,17 +53,19 @@ class OrderService {
   }
 
   Future<OrderModel?> placeOrder({
-    required String shippingAddress,
+    required String deliveryAddress,
     required String shippingPhone,
     required String paymentMethod,
+    required double deliveryFee,
     String? notes,
   }) async {
     final response = await ApiService.instance.post(
       ApiConstants.orders,
       body: {
-        'shipping_address': shippingAddress,
+        'delivery_address': deliveryAddress,
         'shipping_phone': shippingPhone,
         'payment_method': paymentMethod,
+        'delivery_fee': deliveryFee,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
       },
     );

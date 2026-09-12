@@ -4,7 +4,6 @@ import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 
-import '../app/constants/maps_constants.dart';
 import '../models/delivery_location_model.dart';
 
 class GeocodingResult {
@@ -20,6 +19,9 @@ class GeocodingService {
   static final GeocodingService instance = GeocodingService._();
 
   static const Duration _timeout = Duration(seconds: 15);
+
+  /// Nominatim requires a valid User-Agent header per its usage policy.
+  static const String _userAgent = 'com.khorder.app';
 
   Future<GeocodingResult> reverseGeocode({
     required double latitude,
@@ -41,109 +43,73 @@ class GeocodingService {
     }
 
     final uri = Uri.https(
-      'maps.googleapis.com',
-      'maps/api/geocode/json',
+      'nominatim.openstreetmap.org',
+      '/reverse',
       {
-        'latlng': '$latitude,$longitude',
-        'key': MapsConstants.googleApiKey,
-        'language': 'en',
+        'lat': latitude.toString(),
+        'lon': longitude.toString(),
+        'format': 'json',
+        'addressdetails': '1',
+        'accept-language': 'en',
       },
     );
 
     developer.log(
       '[REVERSE GEOCODING REQUEST]\n'
-      'Latitude: $latitude\n'
-      'Longitude: $longitude\n'
-      'Endpoint: ${uri.scheme}://${uri.host}${uri.path}\n'
-      'HTTP method: GET',
+          'Latitude: $latitude\n'
+          'Longitude: $longitude\n'
+          'Endpoint: ${uri.scheme}://${uri.host}${uri.path}\n'
+          'HTTP method: GET',
       name: 'GeocodingService',
     );
 
     try {
-      final response = await http.get(uri).timeout(_timeout);
+      final response = await http
+          .get(uri, headers: {'User-Agent': _userAgent})
+          .timeout(_timeout);
 
       developer.log(
         '[REVERSE GEOCODING RESPONSE]\n'
-        'HTTP Status: ${response.statusCode}\n'
-        'Response body: ${response.body}',
+            'HTTP Status: ${response.statusCode}\n'
+            'Response body: ${response.body}',
         name: 'GeocodingService',
       );
 
       if (response.statusCode != 200) {
         return GeocodingResult(
           errorMessage:
-              'Geocoding server returned HTTP ${response.statusCode}.',
+          'Geocoding server returned HTTP ${response.statusCode}.',
         );
       }
 
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      final status = decoded['status'] as String?;
 
-      if (status != 'OK') {
-        final errorMsg =
-            decoded['error_message'] as String? ?? 'Unknown error ($status)';
-        developer.log(
-          '[REVERSE GEOCODING ERROR]\n'
-          'Google status: $status\n'
-          'Error message: $errorMsg',
-          name: 'GeocodingService',
-        );
-        if (status == 'REQUEST_DENIED') {
-          return GeocodingResult(
-            errorMessage:
-                'Geocoding API request denied. $errorMsg',
-          );
-        }
-        if (status == 'ZERO_RESULTS') {
-          return GeocodingResult(
-            errorMessage:
-                'No address found for this location.',
-          );
-        }
-        if (status == 'OVER_QUERY_LIMIT') {
-          return GeocodingResult(
-            errorMessage:
-                'Geocoding API quota exceeded. Please try again later.',
-          );
-        }
-        if (status == 'INVALID_REQUEST') {
-          return const GeocodingResult(
-            errorMessage: 'Invalid geocoding request.',
-          );
-        }
-        return GeocodingResult(
-          errorMessage: 'Geocoding failed: $errorMsg',
-        );
-      }
-
-      final results = decoded['results'] as List?;
-      if (results == null || results.isEmpty) {
+      final displayName = decoded['display_name'] as String?;
+      if (displayName == null || displayName.isEmpty) {
         return const GeocodingResult(
           errorMessage: 'No address found for this location.',
         );
       }
 
-      final result = results.first as Map<String, dynamic>;
-      final formattedAddress = result['formatted_address'] as String?;
-      if (formattedAddress == null || formattedAddress.isEmpty) {
-        return const GeocodingResult(
-          errorMessage: 'No address found for this location.',
-        );
-      }
-
-      final addressComponents =
-          result['address_components'] as List<dynamic>? ?? const [];
-      final addressLine = _buildLocalAddress(
-        formattedAddress: formattedAddress,
-        components: addressComponents,
+      final address = _buildLocalAddress(
+        displayName: displayName,
+        addressData: decoded['address'] as Map<String, dynamic>?,
       );
 
       return GeocodingResult(
         location: DeliveryLocation(
-          address: addressLine,
+          address: address,
           latitude: latitude,
           longitude: longitude,
         ),
+      );
+    } on http.ClientException catch (e) {
+      developer.log(
+        '[REVERSE GEOCODING ERROR] ClientException: ${e.message}',
+        name: 'GeocodingService',
+      );
+      return const GeocodingResult(
+        errorMessage: 'Network error while finding address. Please check your connection.',
       );
     } on TimeoutException {
       developer.log(
@@ -152,14 +118,6 @@ class GeocodingService {
       );
       return const GeocodingResult(
         errorMessage: 'Geocoding request timed out. Check your connection.',
-      );
-    } on http.ClientException catch (e) {
-      developer.log(
-        '[REVERSE GEOCODING ERROR] ClientException: ${e.message}',
-        name: 'GeocodingService',
-      );
-      return const GeocodingResult(
-        errorMessage: 'Network error while finding address.',
       );
     } on FormatException catch (e) {
       developer.log(
@@ -181,67 +139,58 @@ class GeocodingService {
   }
 
   String _buildLocalAddress({
-    required String formattedAddress,
-    required List<dynamic> components,
+    required String displayName,
+    Map<String, dynamic>? addressData,
   }) {
-    String? street;
-    String? houseNumber;
-    String? district;
-    String? commune;
-    String? city;
-    String? province;
-    String? country;
-
-    for (final component in components) {
-      final map = component as Map<String, dynamic>;
-      final types = (map['types'] as List?)?.whereType<String>().toList() ?? [];
-      final shortName = map['short_name'] as String? ?? '';
-      final longName = map['long_name'] as String? ?? '';
-
-      if (types.contains('street_number')) {
-        houseNumber = shortName;
-      } else if (types.contains('route')) {
-        street = shortName.isNotEmpty ? shortName : longName;
-      } else if (types.contains('sublocality_level_1')) {
-        district = longName;
-      } else if (types.contains('sublocality_level_2')) {
-        commune = longName;
-      } else if (types.contains('locality')) {
-        city = longName;
-      } else if (types.contains('administrative_area_level_1')) {
-        province = longName;
-      } else if (types.contains('country')) {
-        country = longName;
-      }
+    if (addressData == null || addressData.isEmpty) {
+      return displayName;
     }
 
+    String? houseNumber;
+    String? street;
+    String? commune;
+    String? district;
+    String? city;
+    String? state;
+    String? country;
+
+    houseNumber = addressData['house_number'] as String?;
+    street = addressData['road'] as String?;
+    commune = addressData['commune'] as String?;
+    district = addressData['suburb'] as String? ??
+        addressData['neighbourhood'] as String?;
+    city = addressData['city'] as String? ??
+        addressData['town'] as String? ??
+        addressData['village'] as String?;
+    state = addressData['state'] as String?;
+    country = addressData['country'] as String?;
+
     final addressParts = <String>[
-      ?houseNumber,
-      ?street,
+      if (houseNumber != null && street != null) '$street $houseNumber',
+      if (houseNumber == null && street != null) street,
     ];
-    final addressLine = addressParts.join(' ');
 
     final localityParts = <String>[
-      ?commune,
-      ?district,
-    ].join(', ');
+      if (commune != null) commune,
+      if (district != null) district,
+    ].where((e) => e.isNotEmpty).join(', ');
 
-    final cityProvinceParts = <String>[
-      ?city,
-      ?province,
-      ?country,
-    ].join(', ');
+    final regionParts = <String>[
+      if (city != null) city,
+      if (state != null) state,
+      if (country != null) country,
+    ].where((e) => e.isNotEmpty).join(', ');
 
     final parts = <String>[
-      if (addressLine.isNotEmpty) addressLine,
+      if (addressParts.isNotEmpty) addressParts.join(' '),
       if (localityParts.isNotEmpty) localityParts,
-      if (cityProvinceParts.isNotEmpty) cityProvinceParts,
+      if (regionParts.isNotEmpty) regionParts,
     ];
 
     if (parts.isNotEmpty) {
       return parts.join(', ');
     }
 
-    return formattedAddress;
+    return displayName;
   }
 }

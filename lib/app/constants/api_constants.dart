@@ -5,8 +5,8 @@ class ApiConstants {
   ApiConstants._();
 
   static String get baseUrl {
-    return "https://care-timber-celebrate-bell.trycloudflare.com/api";
-    // if (kIsWeb) { https://few-celebs-height-instant.trycloudflare.com
+  return "https://commission-gas-intensity-stored.trycloudflare.com/api";
+    // if (kIsWeb) {
     //   return 'http://127.0.0.1:8000/api';
     // }
     // if (defaultTargetPlatform == TargetPlatform.android) {

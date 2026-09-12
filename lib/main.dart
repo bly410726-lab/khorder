@@ -19,29 +19,30 @@ import 'providers/customer/product_provider.dart';
 import 'providers/theme_provider.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+WidgetsFlutterBinding.ensureInitialized();
 
-        ChangeNotifierProvider(create: (_) => CategoryProvider()),
-        ChangeNotifierProvider(create: (_) => ProductProvider()),
-        ChangeNotifierProvider(create: (_) => CartProvider()),
-        ChangeNotifierProvider(create: (_) => FavoriteProvider()),
-        ChangeNotifierProvider(create: (_) => OrderProvider()),
-        ChangeNotifierProvider(create: (_) => AIChatProvider()),
-        ChangeNotifierProvider(create: (_) => BannerProvider()),
+runApp(
+MultiProvider(
+providers: [
+ChangeNotifierProvider(create: (_) => AuthProvider()),
+ChangeNotifierProvider(create: (_) => ThemeProvider()),
 
-        ChangeNotifierProvider(create: (_) => AdminProductProvider()),
-        ChangeNotifierProvider(create: (_) => AdminCategoryProvider()),
-        ChangeNotifierProvider(create: (_) => AdminOrderProvider()),
-        ChangeNotifierProvider(create: (_) => AdminDashboardProvider()),
-        ChangeNotifierProvider(create: (_) => AdminUserProvider()),
-        ChangeNotifierProvider(create: (_) => AdminBannerProvider()),
-      ],
-      child: const KhOrderApp(),
-    ),
-  );
+ChangeNotifierProvider(create: (_) => CategoryProvider()),
+ChangeNotifierProvider(create: (_) => ProductProvider()),
+ChangeNotifierProvider(create: (_) => CartProvider()),
+ChangeNotifierProvider(create: (_) => FavoriteProvider()),
+ChangeNotifierProvider(create: (_) => OrderProvider()),
+ChangeNotifierProvider(create: (_) => AIChatProvider()),
+ChangeNotifierProvider(create: (_) => BannerProvider()),
+
+ChangeNotifierProvider(create: (_) => AdminProductProvider()),
+ChangeNotifierProvider(create: (_) => AdminCategoryProvider()),
+ChangeNotifierProvider(create: (_) => AdminOrderProvider()),
+ChangeNotifierProvider(create: (_) => AdminDashboardProvider()),
+ChangeNotifierProvider(create: (_) => AdminUserProvider()),
+ChangeNotifierProvider(create: (_) => AdminBannerProvider()),
+],
+child: const KhOrderApp(),
+),
+);
 }
